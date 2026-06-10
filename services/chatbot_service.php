@@ -1,7 +1,6 @@
 <?php
 // 1. Cấu hình API Key Gemini chính chủ của Tài đã cấp
-$api_key = "AQ.Ab8RN6KkOlhqxn4kYlgGJs45VLWygUUNia1MuMxVP45Qw8fr-A"; 
-
+$api_key = "AQ.Ab8RN6KkOlhqxn4kYlgGJs45VLWygUUNia1MuMxVP45Qw8fr-A"; // Xóa cái key thật đi để qua mặt GitHub
 // Kết nối thông suốt MySQL cổng 3307 của Tài
 $conn = new mysqli("127.0.0.1", "root", "", "aistudyhub", 3307);
 if ($conn->connect_error) {
