@@ -1,16 +1,13 @@
 <?php
 session_start();
 ?>
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Tải tài liệu</title>
 </head>
 <body>
-
 <h2>Tải tài liệu lên</h2>
-
 <form action="../../backend/documents/upload_document.php"
       method="POST"
       enctype="multipart/form-data">
@@ -27,8 +24,6 @@ session_start();
     <button type="submit">
         Upload
     </button>
-
 </form>
-
 </body>
 </html>
