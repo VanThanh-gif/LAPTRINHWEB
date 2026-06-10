@@ -1,6 +1,6 @@
 <?php
 
-require_once '../../../config/database.php';
+require_once '../../../Admin/backend/config/connectdb.php';
 
 $id = $_GET['id'];
 
