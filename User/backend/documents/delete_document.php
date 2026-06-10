@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once '../../../config/database.php';
+require_once '../../../Admin/backend/config/connectdb.php';
 
 $user_id = $_SESSION['user_id'];
 
