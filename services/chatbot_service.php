@@ -1,6 +1,8 @@
 <?php
-// 1. Cấu hình API Key Gemini chính chủ của Tài đã cấp
-$api_key = "AQ.Ab8RN6KkOlhqxn4kYlgGJs45VLWygUUNia1MuMxVP45Qw8fr-A"; // Xóa cái key thật đi để qua mặt GitHub
+// 1. Nhúng file cấu hình riêng tư để lấy API Key
+require_once __DIR__ . '/config.php';
+$api_key = $config_api_key; 
+
 // Kết nối thông suốt MySQL cổng 3307 của Tài
 $conn = new mysqli("127.0.0.1", "root", "", "aistudyhub", 3307);
 if ($conn->connect_error) {
@@ -63,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
         exit;
     }
 
-    // 🔥 THUẬT TOÁN PHÒNG THỦ BAO SẬP MẠNG GOOGLE (TỰ ĐỔI MODEL NẾU DÍNH 503)
+    // THUẬT TOÁN PHÒNG THỦ BAO SẬP MẠNG GOOGLE (TỰ ĐỔI MODEL NẾU DÍNH LỖI)
     $models_to_try = [
         "gemini-2.5-flash", 
         "gemini-1.5-pro",   
@@ -92,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
             $result = json_decode($response, true);
             if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
                 $bot_reply = $result['candidates'][0]['content']['parts'][0]['text'];
-                break; // Có câu trả lời ngon lành -> thoát vòng lặp ngay!
+                break; // Thành công -> thoát vòng lặp ngay!
             }
         } else {
             $error_response = $response;
@@ -101,14 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
 
     // Lưu dữ liệu nếu lấy được câu trả lời thành công
     if ($bot_reply !== null) {
-        // Tự động lấy 18 ký tự đầu câu hỏi làm tiêu đề sidebar cho gọn đẹp
         $check_count = $conn->query("SELECT id FROM chat_history WHERE session_id = $session_id");
         if ($check_count->num_rows === 0) {
             $short_title = mb_substr($message, 0, 18) . "...";
             $conn->query("UPDATE chat_sessions SET title = '$short_title' WHERE id = $session_id");
         }
 
-        // Thực hiện chèn lịch sử vào bảng MySQL
         $user_id = 1; 
         $stmt = $conn->prepare("INSERT INTO chat_history (user_id, session_id, message, response) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("iiss", $user_id, $session_id, $message, $bot_reply);
@@ -117,8 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message'])) {
         
         echo $bot_reply;
     } else {
-        // Nếu tất cả các mô hình đồng loạt nghẽn thật sự
-        echo "Hệ thống Google AI đang quá tải. Chi tiết lỗi: " . $error_response;
+        // Trả lỗi chi tiết dạng chuỗi nếu tất cả model sập
+        echo "Hệ thống Google AI phản hồi lỗi. Chi tiết: " . $error_response;
     }
     $conn->close();
 }
