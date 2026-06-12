@@ -62,19 +62,39 @@
             font-size: 0.88rem;
             color: var(--text-sub);
             cursor: pointer;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
             margin-bottom: 8px;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            position: relative;
         }
-        .chat-item i { margin-right: 12px; font-size: 0.95rem; color: #52525b; transition: color 0.2s; }
+        .chat-item-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 8px;
+            flex-grow: 1;
+        }
+        .chat-item i.fa-comment-dots { margin-right: 12px; font-size: 0.95rem; color: #52525b; transition: color 0.2s; }
         .chat-item:hover { background-color: #18181b; color: #fff; }
-        .chat-item:hover i { color: var(--accent-color); }
+        .chat-item:hover i.fa-comment-dots { color: var(--accent-color); }
         .chat-item.active { background-color: #1e1e21; color: #fff; font-weight: 500; box-shadow: inset 3px 0 0 var(--accent-color); }
-        .chat-item.active i { color: var(--accent-color); }
+        .chat-item.active i.fa-comment-dots { color: var(--accent-color); }
+
+        /* Nút thùng rác nhỏ ẩn hiện tinh tế */
+        .delete-session-btn {
+            background: none;
+            border: none;
+            color: #52525b;
+            padding: 2px 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: none;
+            transition: color 0.2s;
+        }
+        .chat-item:hover .delete-session-btn { display: block; }
+        .delete-session-btn:hover { color: #ef4444 !important; }
 
         /* --- BỐ CỤC KHUNG CHAT CHÍNH --- */
         .chat-main { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; position: relative; background-color: var(--main-bg); }
@@ -94,7 +114,7 @@
         .chat-box::-webkit-scrollbar { width: 5px; }
         .chat-box::-webkit-scrollbar-thumb { background: #27272a; border-radius: 6px; }
 
-        /* --- MÀN HÌNH GỢI Ý KHI ĐOẠN CHAT TRỐNG --- */
+        /* --- MÀN HÌNH GỢI Ý KHI TRỐNG --- */
         .welcome-container { text-align: center; margin-top: 4vh; animation: fadeIn 0.6s ease; }
         .welcome-logo { 
             width: 70px; height: 70px; background: var(--accent-gradient); 
@@ -123,7 +143,6 @@
 
         .message { max-width: 80%; font-size: 1.02rem; line-height: 1.65; color: var(--text-main); }
         
-        /* Tin nhắn của sinh viên gõ */
         .user-wrapper { flex-direction: row-reverse; }
         .user-wrapper .avatar { margin-right: 0; margin-left: 20px; }
         .user-wrapper .message { 
@@ -134,7 +153,6 @@
             color: #fff;
         }
 
-        /* Tin nhắn của Chatbot AI trả lời */
         .bot-wrapper .message {
             background-color: var(--bot-msg-bg);
             padding: 16px 24px;
@@ -153,7 +171,6 @@
         .send-btn { background: #27272a; border: none; color: #a1a1aa; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
         .send-btn:hover { background: #fff; color: #000; transform: scale(1.03); }
 
-        /* Hiệu ứng 3 dấu chấm loading nhấp nháy */
         .typing-loader { display: inline-block; font-weight: bold; animation: blink 1.4s infinite both; color: var(--accent-color); }
         .typing-loader:nth-child(2) { animation-delay: .2s; }
         .typing-loader:nth-child(3) { animation-delay: .4s; }
@@ -169,7 +186,7 @@
         </button>
         <div class="chat-list" id="sessionsContainer"></div>
         <div class="text-muted text-center pt-2" style="font-size: 0.78rem; border-top: 1px solid #27272a; color: var(--text-sub) !important;">
-            <i class="fa-solid fa-circle-user text-success me-1"></i> Nguyễn Văn Tài - Nhóm 8
+            <i class="fa-solid fa-circle-user text-success me-1"></i> Nguyễn Văn Tài
         </div>
     </div>
 
@@ -196,6 +213,7 @@
 let currentSessionId = 0;
 let isTyping = false;
 let typingTimeout = null;
+let chatController = null; // Quản lý hủy request mạng thời gian thực
 
 function handleKeyPress(event) {
     if (event.key === 'Enter') sendMessage();
@@ -230,7 +248,6 @@ function appendMessage(text, isUser, triggerTypingEffect = false) {
     wrapper.appendChild(msgDiv);
     chatBox.appendChild(wrapper);
     
-    // Kiểm tra nếu người dùng cuộn lên trên xem tài liệu thì không ép cuộn đáy
     const isAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 100;
     if (isAtBottom || isUser) {
         chatBox.scrollTop = chatBox.scrollHeight;
@@ -238,7 +255,7 @@ function appendMessage(text, isUser, triggerTypingEffect = false) {
 
     if (!isUser && triggerTypingEffect) {
         isTyping = true;
-        toggleStopButton(true); // Biến đổi nút Gửi thành nút Dừng
+        toggleStopButton(true);
         let index = 0;
         msgDiv.innerHTML = "";
         
@@ -267,7 +284,6 @@ function appendMessage(text, isUser, triggerTypingEffect = false) {
     return wrapper;
 }
 
-// Chức năng biến nút Gửi -> Dừng phản hồi giống ChatGPT
 function toggleStopButton(show) {
     const sendBtn = document.querySelector('.send-btn');
     if (show) {
@@ -281,18 +297,59 @@ function toggleStopButton(show) {
     }
 }
 
+// 🌟 SỬA HOÀN CHỈNH: Ép dừng ngay lập tức luồng API ở lần bấm đầu tiên
 function stopGenerating() {
+    if (chatController) {
+        chatController.abort(); // Ngắt ngay kết nối cURL đang chờ từ Google Server
+    }
+
     if (typingTimeout) {
         clearTimeout(typingTimeout);
-        isTyping = false;
-        toggleStopButton(false);
-        
-        const botMessages = document.querySelectorAll('.bot-message-last .message');
-        if(botMessages.length > 0) {
-            const lastMsg = botMessages[botMessages.length - 1];
-            lastMsg.innerHTML = formatBotResponse(lastMsg.textContent + " ⏹️ (Đã dừng phản hồi)");
+    }
+    
+    isTyping = false;
+    toggleStopButton(false);
+    
+    const botWrappers = document.querySelectorAll('.bot-wrapper');
+    if (botWrappers.length > 0) {
+        const lastBotWrapper = botWrappers[botWrappers.length - 1];
+        const msgDiv = lastBotWrapper.querySelector('.message');
+        if (msgDiv) {
+            if (msgDiv.textContent.trim() === "" || msgDiv.textContent.includes("AI đang xử lý")) {
+                msgDiv.innerHTML = "⏹️ (Đã dừng phản hồi)";
+            } else {
+                msgDiv.innerHTML = formatBotResponse(msgDiv.textContent + " ⏹️ (Đã dừng phản hồi)");
+            }
         }
-        loadChatSessions();
+    }
+    loadChatSessions();
+}
+
+function deleteSession(sessionId, event) {
+    event.stopPropagation();
+    
+    if (confirm("Tài có chắc chắn muốn xóa vĩnh viễn đoạn chat này không?")) {
+        const formData = new FormData();
+        formData.append('action', 'delete_session');
+        formData.append('session_id', sessionId);
+
+        fetch('chatbot_service.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (currentSessionId === sessionId) {
+                    currentSessionId = 0;
+                    document.getElementById('chatBox').innerHTML = '';
+                }
+                loadChatSessions();
+            } else {
+                alert("Lỗi xóa dữ liệu: " + data.error);
+            }
+        })
+        .catch(error => console.error('Error:', error));
     }
 }
 
@@ -311,8 +368,15 @@ function loadChatSessions() {
         sessions.forEach(session => {
             const item = document.createElement('div');
             item.className = 'chat-item' + (session.id === currentSessionId ? ' active' : '');
-            item.innerHTML = `<i class="fa-regular fa-comment-dots"></i> ${session.title}`;
-            item.onclick = () => { if(!isTyping) selectSession(session.id); };
+            
+            item.innerHTML = `
+                <div class="chat-item-text" onclick="if(!isTyping) selectSession(${session.id})">
+                    <i class="fa-regular fa-comment-dots"></i> ${session.title}
+                </div>
+                <button class="delete-session-btn" onclick="deleteSession(${session.id}, event)" title="Xóa đoạn chat">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            `;
             container.appendChild(item);
         });
 
@@ -331,7 +395,6 @@ function quickAsk(question) {
 function selectSession(sessionId) {
     currentSessionId = sessionId;
     document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-    loadChatSessions();
 
     const chatBox = document.getElementById('chatBox');
     chatBox.innerHTML = '';
@@ -339,6 +402,13 @@ function selectSession(sessionId) {
     fetch(`chatbot_service.php?action=get_history&session_id=${sessionId}`)
     .then(response => response.json())
     .then(history => {
+        document.querySelectorAll('.chat-item').forEach(el => {
+            const textEl = el.querySelector('.chat-item-text');
+            if (textEl && textEl.getAttribute('onclick').includes(sessionId)) {
+                el.classList.add('active');
+            }
+        });
+
         if(history.length === 0) {
             chatBox.innerHTML = `
                 <div class="welcome-container">
@@ -401,9 +471,14 @@ function sendMessage() {
     formData.append('message', messageText);
     formData.append('session_id', currentSessionId);
 
+    // 🌟 KHỞI TẠO TÍN HIỆU NGẮT KẾT NỐI MẠNG
+    chatController = new AbortController();
+    const signal = chatController.signal;
+
     fetch('chatbot_service.php', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: signal // Gắn bộ kích hoạt ngắt lệnh
     })
     .then(response => response.text())
     .then(data => {
@@ -413,7 +488,12 @@ function sendMessage() {
     })
     .catch(error => {
         toggleStopButton(false);
-        loadingWrapper.querySelector('.message').textContent = 'Hệ thống bận. Vui lòng thử lại!';
+        if (loadingWrapper) loadingWrapper.remove();
+        if (error.name === 'AbortError') {
+            console.log('User click stop button successfully.');
+        } else {
+            alert('Hệ thống bận. Vui lòng thử lại!');
+        }
     });
 }
 
