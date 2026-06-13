@@ -92,12 +92,59 @@ $documents = [
                     </a>
                 </li>
 
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        Tài liệu
-                    </a>
-                </li>
+               <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle"
+       href="#"
+       id="documentsDropdown"
+       role="button"
+       data-bs-toggle="dropdown"
+       aria-expanded="false">
+        Tài liệu
+    </a>
 
+    <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+            <a class="dropdown-item" href="#">
+                📚 Danh sách tài liệu
+            </a>
+        </li>
+
+        <li>
+            <a class="dropdown-item" href="#">
+                ⬆️ Upload tài liệu
+            </a>
+        </li>
+
+        <li>
+            <a class="dropdown-item" href="#">
+                🔍 Tìm kiếm tài liệu
+            </a>
+        </li>
+
+        <li>
+            <a class="dropdown-item" href="#">
+                📂 Lọc theo môn học
+            </a>
+        </li>
+
+        <li>
+            <a class="dropdown-item" href="#">
+                📥 Tải xuống tài liệu
+            </a>
+        </li>
+
+        <li>
+            <a class="dropdown-item" href="#">
+                📁 Tài liệu của tôi
+            </a>
+        </li>
+    </ul>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="ai_assistant.php">
+        AI Chatbot
+    </a>
+</li>
                 <li class="nav-item">
                     <a class="nav-link" href="#">
                         Đăng nhập
