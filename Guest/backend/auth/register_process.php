@@ -1,41 +1,44 @@
 <?php
-session_start();
-// Đi ngược 3 cấp thư mục để vào Admin/backend/config/connectdb.php
-require_once '../../../Admin/backend/config/connectdb.php'; 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/AIStudyHub/config/connectdb.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
-    $password = $_POST['password'];
+    $password = trim($_POST['password']); 
+    
+    // Mặc định tài khoản đăng ký mới từ Form sẽ mang quyền user (Sinh viên)
+    $role = 'user'; 
+    $status = 'active';
 
     if (empty($username) || empty($email) || empty($password)) {
-        $_SESSION['error'] = "Vui lòng nhập đầy đủ thông tin!";
-        header("Location: ../../frontend/auth/register.php");
+        echo "<script>alert('Vui lòng nhập đầy đủ các trường dữ liệu!'); window.history.back();</script>";
         exit();
     }
 
     try {
-        $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            $_SESSION['error'] = "Email này đã được sử dụng!";
-            header("Location: ../../frontend/auth/register.php");
+        // Kiểm tra xem Email đăng ký này đã tồn tại trong CSDL chưa
+        $check = $conn->prepare("SELECT user_id FROM users WHERE email = ? LIMIT 1");
+        $check->execute([$email]);
+        if ($check->rowCount() > 0) {
+            echo "<script>alert('Email này đã được sử dụng! Vui lòng chọn Email khác.'); window.history.back();</script>";
             exit();
         }
 
-        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+        // Thực hiện ghi dữ liệu tài khoản User mới vào bảng users
+        $sql = "INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$username, $email, $password, $role, $status]);
 
-        $insertStmt = $conn->prepare("INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'active')");
-        $insertStmt->execute([$username, $email, $hashed_password]);
-
-        $_SESSION['success'] = "Đăng ký thành công! Hãy đăng nhập.";
-        header("Location: ../../frontend/auth/login.php");
+        echo "<script>alert('Đăng ký tài khoản thành công! Hãy đăng nhập hệ thống.'); window.location.href='/AIStudyHub/Guest/frontend/auth/login.php';</script>";
         exit();
 
     } catch (PDOException $e) {
-        $_SESSION['error'] = "Lỗi hệ thống: " . $e->getMessage();
-        header("Location: ../../frontend/auth/register.php");
-        exit();
+        die("Lỗi xử lý tạo tài khoản: " . $e->getMessage());
     }
+} else {
+    header("Location: /AIStudyHub/Guest/frontend/auth/login.php");
+    exit();
 }
-?>
