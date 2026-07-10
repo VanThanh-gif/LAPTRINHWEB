@@ -1,0 +1,196 @@
+<?php
+// Bật hiển thị lỗi
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Bắt buộc đăng nhập
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../guest/login.php");
+    exit();
+}
+
+require_once __DIR__ . '/../../config/connectdb.php';
+
+$user_id = $_SESSION['user_id'];
+$message = '';
+$msg_type = '';
+
+// Lấy thông tin hiện tại từ DB để điền sẵn vào Form
+try {
+    $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    $current_user = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $current_user = ['username' => $_SESSION['username'], 'email' => ''];
+}
+
+// XỬ LÝ KHI NGƯỜI DÙNG BẤM NÚT "LƯU THAY ĐỔI"
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $new_name = trim($_POST['username']);
+    $new_email = trim($_POST['email']);
+    $new_password = $_POST['new_password'];
+
+    if (empty($new_name) || empty($new_email)) {
+        $message = "Tên và Email không được để trống!";
+        $msg_type = "danger";
+    } else {
+        try {
+            // Nếu có nhập mật khẩu mới thì cập nhật cả mật khẩu
+            if (!empty($new_password)) {
+                // Thực tế đồ án nhớ dùng password_hash() nhé, ở đây tớ làm demo
+                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?");
+                $update_stmt->execute([$new_name, $new_email, $hashed_password, $user_id]);
+            } else {
+                // Chỉ cập nhật tên và email
+                $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ? WHERE id = ?");
+                $update_stmt->execute([$new_name, $new_email, $user_id]);
+            }
+
+            // Cập nhật lại Session để giao diện Navbar đổi tên ngay lập tức
+            $_SESSION['username'] = $new_name;
+            $_SESSION['email'] = $new_email;
+            
+            $message = "Cập nhật hồ sơ thành công!";
+            $msg_type = "success";
+            
+            // Cập nhật lại biến $current_user để hiển thị vào form
+            $current_user['username'] = $new_name;
+            $current_user['email'] = $new_email;
+
+        } catch (PDOException $e) {
+            $message = "Lỗi cập nhật: Email này có thể đã được sử dụng.";
+            $msg_type = "danger";
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chỉnh Sửa Hồ Sơ - AI Study Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
+        
+        .edit-card {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+            padding: 40px;
+            margin-top: 40px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .form-label { font-weight: 600; color: #334155; margin-bottom: 8px; }
+        .form-control {
+            border-radius: 12px;
+            padding: 14px 20px;
+            border: 1.5px solid #e2e8f0;
+            background-color: #f8fafc;
+            transition: all 0.2s;
+        }
+        .form-control:focus {
+            border-color: #3b82f6;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+        
+        .btn-save {
+            background-color: #2563eb;
+            color: white;
+            border-radius: 12px;
+            padding: 14px 30px;
+            font-weight: 700;
+            transition: all 0.3s;
+        }
+        .btn-save:hover { background-color: #1d4ed8; transform: translateY(-2px); box-shadow: 0 8px 15px rgba(37,99,235,0.2); color: white;}
+        
+        .btn-cancel {
+            background-color: #f1f5f9;
+            color: #64748b;
+            border-radius: 12px;
+            padding: 14px 30px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-cancel:hover { background-color: #e2e8f0; color: #0f172a; }
+    </style>
+</head>
+<body>
+
+<?php include __DIR__ . '/../../includes/navbar.php'; ?>
+
+<div class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            
+            <div class="d-flex align-items-center mt-5 mb-2">
+                <a href="profile.php" class="text-decoration-none text-muted me-3 fs-5"><i class="bi bi-arrow-left-circle-fill"></i></a>
+                <h3 class="fw-bold text-dark m-0">Cập nhật hồ sơ</h3>
+            </div>
+
+            <div class="edit-card">
+                
+                <?php if ($message): ?>
+                    <div class="alert alert-<?= $msg_type ?> alert-dismissible fade show rounded-4" role="alert">
+                        <i class="bi bi-info-circle-fill me-2"></i> <?= $message ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+
+                <form action="" method="POST">
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Họ và tên hiển thị</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 rounded-start-4 px-3"><i class="bi bi-person text-muted"></i></span>
+                            <input type="text" name="username" class="form-control border-start-0 ps-0" value="<?= htmlspecialchars($current_user['username']) ?>" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Địa chỉ Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 rounded-start-4 px-3"><i class="bi bi-envelope text-muted"></i></span>
+                            <input type="email" name="email" class="form-control border-start-0 ps-0" value="<?= htmlspecialchars($current_user['email']) ?>" required>
+                        </div>
+                    </div>
+
+                    <hr class="my-4 text-muted">
+
+                    <div class="mb-5">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Mật khẩu mới</span>
+                            <small class="text-muted fw-normal">(Bỏ trống nếu không muốn đổi)</small>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 rounded-start-4 px-3"><i class="bi bi-shield-lock text-muted"></i></span>
+                            <input type="password" name="new_password" class="form-control border-start-0 ps-0" placeholder="Nhập mật khẩu mới...">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-save flex-grow-1"><i class="bi bi-check2-circle me-2"></i> Lưu Thay Đổi</button>
+                        <a href="profile.php" class="btn btn-cancel">Hủy bỏ</a>
+                    </div>
+
+                </form>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
