@@ -58,8 +58,6 @@ Sử dụng các tài khoản dưới đây để test các chức năng phân q
 
 - Email: `user@aistudyhub.com`
 - Mật khẩu: `123456`
-  **3. Key Gemini**
-  AQ.Ab8RN6L7fDokVS-jmehxJ_WMKfv3_c7cqGaeGBvkTc75YAOWTg
 
 ---
 
