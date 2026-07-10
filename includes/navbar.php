@@ -35,7 +35,7 @@ if (session_status() === PHP_SESSION_NONE) {
             
             <div class="dropdown">
               <a class="text-white text-decoration-none dropdown-toggle fw-medium d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="https://ui-avatars.com/api/?name=<?= urlencode($_SESSION['username'] ?? 'U') ?>&background=0D6EFD&color=fff&bold=true" alt="Avatar" class="rounded-circle" width="35" height="35">
+                <img src="<?= !empty($_SESSION['avatar']) ? htmlspecialchars($_SESSION['avatar']) : 'https://ui-avatars.com/api/?name=' . urlencode($_SESSION['username'] ?? 'U') . '&background=0D6EFD&color=fff&bold=true' ?>" alt="Avatar" class="rounded-circle" width="35" height="35">
                 <span>Chào, <?= htmlspecialchars($_SESSION['username'] ?? 'Bạn') ?></span>
               </a>
               

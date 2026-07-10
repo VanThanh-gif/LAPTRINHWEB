@@ -17,7 +17,7 @@ $avatar_src = $_SESSION['avatar'] ?? null;
 
 // (Tùy chọn) Lấy thêm thông tin chi tiết từ Database nếu cần
 try {
-    $stmt = $conn->prepare("SELECT email, created_at FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT email, created_at, avatar FROM users WHERE user_id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -122,7 +122,7 @@ try {
             <div class="profile-card">
                 
                 <div class="avatar-container">
-                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($user_name) ?>&background=0D6EFD&color=fff&size=256" alt="Avatar" class="avatar-img">
+                    <img src="<?= !empty($avatar_src) ? htmlspecialchars($avatar_src) : 'https://ui-avatars.com/api/?name=' . urlencode($user_name) . '&background=0D6EFD&color=fff&size=256' ?>" alt="Avatar" class="avatar-img">
                 </div>
                 
                 <div class="text-center mb-5">

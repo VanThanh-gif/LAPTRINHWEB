@@ -14,9 +14,12 @@ $msg_type = '';
 
 // Lấy thông tin hiện tại từ DB để điền sẵn vào Form
 try {
-    $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT username, email FROM users WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $current_user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$current_user) {
+        $current_user = ['username' => $_SESSION['username'], 'email' => ''];
+    }
 } catch (PDOException $e) {
     $current_user = ['username' => $_SESSION['username'], 'email' => ''];
 }
@@ -31,68 +34,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = "Tên và Email không được để trống!";
         $msg_type = "danger";
     } else {
+        // Validate email uniqueness first
         try {
-            // Handle avatar upload (optional)
-            $avatar_path = null;
-            if (isset($_FILES['avatar']) && isset($_FILES['avatar']['tmp_name']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-                $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                $mime = finfo_file($finfo, $_FILES['avatar']['tmp_name']);
-                finfo_close($finfo);
+            $check = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ? LIMIT 1");
+            $check->execute([$new_email, $user_id]);
+            $conflict = $check->fetch(PDO::FETCH_ASSOC);
+            if ($conflict) {
+                $message = "Email này đã được sử dụng bởi tài khoản khác.";
+                $msg_type = "danger";
+            } else {
+                // No conflict — proceed with updates
+                // Handle avatar upload (optional)
+                $avatar_path = null;
+                if (isset($_FILES['avatar']) && isset($_FILES['avatar']['tmp_name']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+                    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime = finfo_file($finfo, $_FILES['avatar']['tmp_name']);
+                    finfo_close($finfo);
 
-                if (!isset($allowed[$mime])) {
-                    $message = "File avatar không hợp lệ (chỉ JPG/PNG/GIF).";
-                    $msg_type = "danger";
-                } elseif ($_FILES['avatar']['size'] > 2 * 1024 * 1024) {
-                    $message = "Kích thước avatar tối đa 2MB.";
-                    $msg_type = "danger";
-                } else {
-                    $ext = $allowed[$mime];
-                    $uploadDir = __DIR__ . '/../../Uploads/avatars';
-                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-                    $filename = 'avatar_' . $user_id . '_' . time() . '.' . $ext;
-                    $dest = $uploadDir . '/' . $filename;
-                    if (move_uploaded_file($_FILES['avatar']['tmp_name'], $dest)) {
-                        $avatar_path = 'Uploads/avatars/' . $filename;
+                    if (!isset($allowed[$mime])) {
+                        $message = "File avatar không hợp lệ (chỉ JPG/PNG/GIF).";
+                        $msg_type = "danger";
+                    } elseif ($_FILES['avatar']['size'] > 2 * 1024 * 1024) {
+                        $message = "Kích thước avatar tối đa 2MB.";
+                        $msg_type = "danger";
+                    } else {
+                        $ext = $allowed[$mime];
+                        $uploadDir = __DIR__ . '/../../Uploads/avatars';
+                        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                        $filename = 'avatar_' . $user_id . '_' . time() . '.' . $ext;
+                        $dest = $uploadDir . '/' . $filename;
+                        if (move_uploaded_file($_FILES['avatar']['tmp_name'], $dest)) {
+                            $avatar_path = '/LAPTRINHWEB/Uploads/avatars/' . $filename;
+                        } else {
+                            $message = "Không thể lưu file avatar, thử lại.";
+                            $msg_type = "danger";
+                        }
+                    }
+                }
+
+                // If no avatar/file errors, do DB updates
+                if (empty($message)) {
+                    if (!empty($new_password)) {
+                        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                        $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE user_id = ?");
+                        $update_stmt->execute([$new_name, $new_email, $hashed_password, $user_id]);
+                    } else {
+                        $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ? WHERE user_id = ?");
+                        $update_stmt->execute([$new_name, $new_email, $user_id]);
+                    }
+
+                    // Update avatar column if file uploaded
+                    if ($avatar_path) {
                         try {
-                            $stmtAvatar = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                            $stmtAvatar = $conn->prepare("UPDATE users SET avatar = ? WHERE user_id = ?");
                             $stmtAvatar->execute([$avatar_path, $user_id]);
                             $_SESSION['avatar'] = $avatar_path;
                         } catch (PDOException $e) {
-                            // If DB doesn't have avatar column, ignore and continue
+                            // ignore if avatar column missing
                         }
-                    } else {
-                        $message = "Không thể lưu file avatar, thử lại.";
-                        $msg_type = "danger";
                     }
+
+                    // Update session and current_user
+                    $_SESSION['username'] = $new_name;
+                    $_SESSION['email'] = $new_email;
+                    $message = "Cập nhật hồ sơ thành công!";
+                    $msg_type = "success";
+                    $current_user['username'] = $new_name;
+                    $current_user['email'] = $new_email;
+
+                    // Redirect to profile page so navbar/avatar refreshes immediately
+                    header('Location: profile.php?updated=1');
+                    exit;
                 }
             }
-
-            // Nếu có nhập mật khẩu mới thì cập nhật cả mật khẩu
-            if (!empty($new_password)) {
-                // Thực tế đồ án nhớ dùng password_hash() nhé, ở đây tớ làm demo
-                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?");
-                $update_stmt->execute([$new_name, $new_email, $hashed_password, $user_id]);
-            } else {
-                // Chỉ cập nhật tên và email
-                $update_stmt = $conn->prepare("UPDATE users SET username = ?, email = ? WHERE id = ?");
-                $update_stmt->execute([$new_name, $new_email, $user_id]);
-            }
-
-            // Cập nhật lại Session để giao diện Navbar đổi tên ngay lập tức
-            $_SESSION['username'] = $new_name;
-            $_SESSION['email'] = $new_email;
-            
-            $message = "Cập nhật hồ sơ thành công!";
-            $msg_type = "success";
-            
-            // Cập nhật lại biến $current_user để hiển thị vào form
-            $current_user['username'] = $new_name;
-            $current_user['email'] = $new_email;
-
         } catch (PDOException $e) {
-            $message = "Lỗi cập nhật: Email này có thể đã được sử dụng.";
+            $message = "Lỗi hệ thống khi cập nhật, thử lại sau.";
             $msg_type = "danger";
         }
     }
@@ -152,6 +169,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             transition: all 0.3s;
         }
+
+        .avatar-preview {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #f3f4f6;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 1px solid #d1d5db;
+        }
+
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+        }
         .btn-cancel:hover { background-color: #e2e8f0; color: #0f172a; }
     </style>
 </head>
@@ -197,8 +235,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <div class="mb-4">
                         <label class="form-label">Ảnh đại diện (Avatar)</label>
-                        <input type="file" name="avatar" accept="image/*" class="form-control">
-                        <small class="text-muted">Kích thước tối đa 2MB. JPG/PNG/GIF.</small>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="avatar-preview" id="avatarPreview">
+                                <img src="<?= !empty($_SESSION['avatar']) ? htmlspecialchars($_SESSION['avatar']) : 'https://ui-avatars.com/api/?name=' . urlencode($_SESSION['username'] ?? $current_user['username']) . '&background=0D6EFD&color=fff&size=256' ?>" alt="Avatar Preview" />
+                            </div>
+                            <div class="flex-grow-1">
+                                <input type="file" id="avatarInput" name="avatar" accept="image/*" class="form-control">
+                                <small class="text-muted">Kích thước tối đa 2MB. JPG/PNG/GIF.</small>
+                            </div>
+                        </div>
                     </div>
 
                     <hr class="my-4 text-muted">
@@ -227,5 +272,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var avatarInput = document.getElementById('avatarInput');
+        var avatarPreview = document.querySelector('#avatarPreview img');
+
+        if (avatarInput && avatarPreview) {
+            avatarInput.addEventListener('change', function () {
+                var file = this.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    avatarPreview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    });
+</script>
 </body>
 </html>
