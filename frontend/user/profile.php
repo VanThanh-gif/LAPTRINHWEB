@@ -3,23 +3,17 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Bắt buộc phải đăng nhập mới được vào xem hồ sơ
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../guest/login.php");
-    exit();
-}
-
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_login();
 require_once __DIR__ . '/../../config/connectdb.php';
 
 // Khởi tạo thông tin mặc định từ Session
+// Load from session first
 $user_name = $_SESSION['username'] ?? 'Thành viên AI Study Hub';
 $user_email = $_SESSION['email'] ?? 'Chưa cập nhật email';
 $user_role = $_SESSION['role'] ?? 'user';
 $join_date = 'Mới tham gia';
+$avatar_src = $_SESSION['avatar'] ?? null;
 
 // (Tùy chọn) Lấy thêm thông tin chi tiết từ Database nếu cần
 try {
@@ -31,6 +25,9 @@ try {
         $user_email = $user_data['email'];
         if (!empty($user_data['created_at'])) {
             $join_date = date('d/m/Y', strtotime($user_data['created_at']));
+        }
+        if (isset($user_data['avatar']) && !empty($user_data['avatar'])) {
+            $avatar_src = $user_data['avatar'];
         }
     }
 } catch (PDOException $e) {

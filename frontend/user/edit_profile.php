@@ -3,16 +3,9 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Bắt buộc đăng nhập
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../guest/login.php");
-    exit();
-}
-
+// Central auth + DB
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_login();
 require_once __DIR__ . '/../../config/connectdb.php';
 
 $user_id = $_SESSION['user_id'];
@@ -39,6 +32,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg_type = "danger";
     } else {
         try {
+            // Handle avatar upload (optional)
+            $avatar_path = null;
+            if (isset($_FILES['avatar']) && isset($_FILES['avatar']['tmp_name']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+                $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = finfo_file($finfo, $_FILES['avatar']['tmp_name']);
+                finfo_close($finfo);
+
+                if (!isset($allowed[$mime])) {
+                    $message = "File avatar không hợp lệ (chỉ JPG/PNG/GIF).";
+                    $msg_type = "danger";
+                } elseif ($_FILES['avatar']['size'] > 2 * 1024 * 1024) {
+                    $message = "Kích thước avatar tối đa 2MB.";
+                    $msg_type = "danger";
+                } else {
+                    $ext = $allowed[$mime];
+                    $uploadDir = __DIR__ . '/../../Uploads/avatars';
+                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                    $filename = 'avatar_' . $user_id . '_' . time() . '.' . $ext;
+                    $dest = $uploadDir . '/' . $filename;
+                    if (move_uploaded_file($_FILES['avatar']['tmp_name'], $dest)) {
+                        $avatar_path = 'Uploads/avatars/' . $filename;
+                        try {
+                            $stmtAvatar = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                            $stmtAvatar->execute([$avatar_path, $user_id]);
+                            $_SESSION['avatar'] = $avatar_path;
+                        } catch (PDOException $e) {
+                            // If DB doesn't have avatar column, ignore and continue
+                        }
+                    } else {
+                        $message = "Không thể lưu file avatar, thử lại.";
+                        $msg_type = "danger";
+                    }
+                }
+            }
+
             // Nếu có nhập mật khẩu mới thì cập nhật cả mật khẩu
             if (!empty($new_password)) {
                 // Thực tế đồ án nhớ dùng password_hash() nhé, ở đây tớ làm demo
@@ -148,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <form action="" method="POST">
+                <form action="" method="POST" enctype="multipart/form-data">
                     
                     <div class="mb-4">
                         <label class="form-label">Họ và tên hiển thị</label>
@@ -164,6 +193,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <span class="input-group-text bg-light border-end-0 rounded-start-4 px-3"><i class="bi bi-envelope text-muted"></i></span>
                             <input type="email" name="email" class="form-control border-start-0 ps-0" value="<?= htmlspecialchars($current_user['email']) ?>" required>
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Ảnh đại diện (Avatar)</label>
+                        <input type="file" name="avatar" accept="image/*" class="form-control">
+                        <small class="text-muted">Kích thước tối đa 2MB. JPG/PNG/GIF.</small>
                     </div>
 
                     <hr class="my-4 text-muted">
