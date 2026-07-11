@@ -1,28 +1,26 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+// 1. Đã sửa lại đường dẫn Login chuẩn của LAPTRINHWEB
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    header("Location: /AIStudyHub/Guest/frontend/auth/login.php");
+    header("Location: /LAPTRINHWEB/frontend/guest/login.php");
     exit();
 }
 
-// Kết nối database an toàn tuyệt đối bằng DOCUMENT_ROOT
-require_once $_SERVER['DOCUMENT_ROOT'] . '/AIStudyHub/config/connectdb.php';
+// 2. Kết nối database an toàn tuyệt đối bằng DOCUMENT_ROOT
+require_once $_SERVER['DOCUMENT_ROOT'] . '/LAPTRINHWEB/config/connectdb.php';
 
 // Lấy danh sách lịch sử chat từ cơ sở dữ liệu
 try {
-    // Giả định bảng lưu lịch sử chatbot của bạn tên là chatbot_logs hoặc tương đương.
-    // Đoạn query này lấy thông tin người dùng chat và nội dung câu hỏi/trả lời.
     $query = "SELECT c.*, u.username 
               FROM chatbot_logs c
               LEFT JOIN users u ON c.user_id = u.user_id 
               ORDER BY c.log_id DESC";
     
-    // Kiểm tra nếu bảng tồn tại trong DB, nếu không có bảng này thì tự động tạo mảng rỗng để tránh sập giao diện
     $stmt = $conn->query("SHOW TABLES LIKE 'chatbot_logs'");
     if ($stmt->rowCount() > 0) {
         $chats = $conn->query($query)->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        // Khởi tạo dữ liệu mẫu nếu database thực tế chưa chạy migrate bảng logs
         $chats = [
             [
                 'username' => 'Trần Minh Tuấn',
@@ -33,7 +31,6 @@ try {
         ];
     }
 } catch (PDOException $e) {
-    // Nếu lỗi database, không làm sập giao diện, tạo mảng rỗng để trang vẫn hiển thị đẹp
     $chats = [];
 }
 ?>
@@ -62,13 +59,14 @@ try {
             <div class="p-3 text-center border-bottom border-secondary">
                 <h5 class="fw-bold mb-0 text-info"><i class="bi bi-cpu-fill me-2"></i>AI Study Hub</h5>
             </div>
+            
             <ul class="nav flex-column mt-3">
-                <li class="nav-item"><a class="nav-link" href="../dashboard/dashboard.php"><i class="bi bi-speedometer2 me-2"></i> Tổng quan</a></li>
-                <li class="nav-item"><a class="nav-link" href="../users/users.php"><i class="bi bi-people me-2"></i> Quản lý Thành viên</a></li>
-                <li class="nav-item"><a class="nav-link" href="../documents/documents.php"><i class="bi bi-file-earmark-text me-2"></i> Duyệt Tài liệu</a></li>
-                <li class="nav-item"><a class="nav-link active" href="#"><i class="bi bi-chat-left-dots me-2"></i> Lịch sử Chatbot</a></li>
+                <li class="nav-item"><a class="nav-link" href="dashboard.php"><i class="bi bi-speedometer2 me-2"></i> Tổng quan</a></li>
+                <li class="nav-item"><a class="nav-link" href="users.php"><i class="bi bi-people me-2"></i> Quản lý Thành viên</a></li>
+                <li class="nav-item"><a class="nav-link" href="documents.php"><i class="bi bi-file-earmark-text me-2"></i> Duyệt Tài liệu</a></li>
+                <li class="nav-item"><a class="nav-link active" href="chats.php"><i class="bi bi-chat-left-dots me-2"></i> Lịch sử Chatbot</a></li>
                 <li class="nav-item mt-4">
-                    <a class="nav-link text-danger border-0" href="/AIStudyHub/Guest/backend/auth/logout.php">
+                    <a class="nav-link text-danger border-0" href="/LAPTRINHWEB/frontend/guest/logout.php" onclick="return confirm('Bạn muốn đăng xuất khỏi trang quản trị?');">
                         <i class="bi bi-box-arrow-right me-2"></i> Đăng xuất
                     </a>
                 </li>

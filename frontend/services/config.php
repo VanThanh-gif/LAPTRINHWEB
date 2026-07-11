@@ -1,2 +1,3 @@
 <?php
-$config_api_key = "";
+$config_api_key = ""; 
+?>

@@ -52,12 +52,7 @@ Sử dụng các tài khoản dưới đây để test các chức năng phân q
 **1. Tài khoản Super Admin (Quản trị viên):**
 
 - Email: `admin@aistudyhub.com`
-- Mật khẩu: `123456` (Hoặc mật khẩu bạn đã thiết lập)
-
-**2. Tài khoản User (Sinh viên):**
-
-- Email: `user@aistudyhub.com`
-- Mật khẩu: `123456`
+- Mật khẩu: `admin123` (Hoặc mật khẩu bạn đã thiết lập)
 
 ---
 

@@ -1,102 +1,89 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (session_status() === PHP_SESSION_NONE) session_start();
+require_once $_SERVER['DOCUMENT_ROOT'] . '/LAPTRINHWEB/config/connectdb.php';
 
-// Bảo mật: Nếu chưa đăng nhập tài khoản User thì đẩy ra trang login
+// Kiểm tra bảo mật
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /AIStudyHub/Guest/frontend/auth/login.php");
+    echo "<script>alert('Vui lòng đăng nhập trước!'); window.location.href='/LAPTRINHWEB/frontend/guest/login.php';</script>";
     exit();
 }
-
-// Kết nối database an toàn từ thư mục gốc
-require_once $_SERVER['DOCUMENT_ROOT'] . '/AIStudyHub/config/connectdb.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = trim($_POST['title']);
-    $author = trim($_POST['author']);
-    $category_id = (int)$_POST['category_id'];
     $user_id = $_SESSION['user_id'];
-    $status = 'pending'; // Trạng thái mặc định chờ Admin duyệt
-
-    // Kiểm tra xem file đã được chọn từ máy tính chưa
-    if (!isset($_FILES['document_file']) || $_FILES['document_file']['error'] !== UPLOAD_ERR_OK) {
-        echo "<script>alert('Vui lòng chọn một file tài liệu hợp lệ từ máy tính của bạn!'); window.history.back();</script>";
-        exit();
-    }
-
-    $file = $_FILES['document_file'];
-    $fileName = $file['name'];
-    $fileTmpName = $file['tmp_name'];
+    $role = $_SESSION['role'] ?? 'user';
     
-    // Thư mục lưu trữ file thực tế trên ổ đĩa máy tính (htdocs/AIStudyHub/uploads/)
-    $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/AIStudyHub/uploads/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true); // Nếu chưa có thư mục uploads thì tự động tạo mới
-    }
+    // Lấy dữ liệu từ Form
+    $title = trim($_POST['title'] ?? '');
+    $author = trim($_POST['author'] ?? '');
+    $category_val = trim($_POST['category_id'] ?? ''); 
+    $thumbnail = trim($_POST['thumbnail'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $file_path = trim($_POST['file_path'] ?? '');
 
-    // Đổi tên file sang chuỗi ngẫu nhiên để tránh trùng tên tệp tin trên máy chủ
-    $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    $newFileName = time() . '_' . uniqid() . '.' . $fileExtension;
-    $targetFilePath = $uploadDir . $newFileName;
-
-    // Các định dạng file tài liệu an toàn được phép tải lên
-    $allowedTypes = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'];
-
-    if (in_array($fileExtension, $allowedTypes)) {
-        // Thực hiện di chuyển file vật lý từ máy tính vào thư mục dự án
-        if (move_uploaded_file($fileTmpName, $targetFilePath)) {
-            try {
-                
-                // --- THUẬT TOÁN TỰ ĐỘNG DÒ TÊN CỘT DATABASE ĐỂ TRÁNH LỖI UNKNOWN COLUMN ---
-                $column_name = 'file_path'; // Tên mặc định giả định
-                
-                // Lấy danh sách toàn bộ tên các cột thực tế của bảng documents trong DB của bạn
-                $q_columns = $conn->query("DESCRIBE documents")->fetchAll(PDO::FETCH_COLUMN);
-                
-                // Tự động kiểm tra xem cấu trúc bảng thực tế của bạn đang đặt tên cột lưu file là gì để khớp lệnh
-                if (in_array('file_path', $q_columns)) {
-                    $column_name = 'file_path';
-                } elseif (in_array('file', $q_columns)) {
-                    $column_name = 'file';
-                } elseif (in_array('document_url', $q_columns)) {
-                    $column_name = 'document_url';
-                } elseif (in_array('path', $q_columns)) {
-                    $column_name = 'path';
-                } else {
-                    // Nếu không tìm thấy cột lưu file quen thuộc, hệ thống sẽ tự lấy cột tùy chỉnh còn lại của bạn
-                    $ignored = ['document_id', 'title', 'author', 'category_id', 'user_id', 'status', 'created_at', 'upload_date'];
-                    foreach($q_columns as $col) {
-                        if(!in_array($col, $ignored)) {
-                            $column_name = $col;
-                            break;
-                        }
-                    }
-                }
-
-                // Thực hiện câu lệnh INSERT SQL động cực kỳ an toàn
-                $sql = "INSERT INTO documents (title, author, category_id, user_id, {$column_name}, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, NOW())";
-                
-                $stmt = $conn->prepare($sql);
-                $stmt->execute([$title, $author, $category_id, $user_id, $newFileName, $status]);
-
-                // Thành công: Đưa về trang kho tài liệu của sinh viên
-                echo "<script>alert('Tải tài liệu lên thành công! Vui lòng chờ Admin kiểm duyệt.'); window.location.href='/AIStudyHub/User/frontend/documents/document.php';</script>";
-                exit();
-
-            } catch (PDOException $e) {
-                // Nếu lưu DB thất bại thì xóa file vật lý vừa tải lên để tránh rác ổ cứng
-                if(file_exists($targetFilePath)) { unlink($targetFilePath); }
-                die("Lỗi đồng bộ Cơ sở dữ liệu: " . $e->getMessage());
-            }
-        } else {
-            echo "<script>alert('Không thể lưu file vào thư mục uploads trên máy chủ!'); window.history.back();</script>";
-            exit();
-        }
-    } else {
-        echo "<script>alert('Định dạng file không hợp lệ! Chỉ cho phép tải lên file PDF, Word, PowerPoint, TXT.'); window.history.back();</script>";
+    if (empty($title) || empty($file_path)) {
+        echo "<script>alert('Tên tài liệu và Đường dẫn không được để trống!'); window.history.back();</script>";
         exit();
     }
-} else {
-    header("Location: /AIStudyHub/User/frontend/documents/upload.php");
-    exit();
+
+    $status = ($role === 'admin') ? 'approved' : 'pending'; 
+
+    try {
+        // 🚀 BƯỚC 1: Lấy danh sách TẤT CẢ các cột thực tế đang có trong bảng documents của sếp
+        $cols = $conn->query("DESCRIBE documents")->fetchAll(PDO::FETCH_COLUMN);
+        
+        $insert_cols = [];
+        $insert_vals = [];
+
+        // 🚀 BƯỚC 2: Hàm Tự Động Khớp Cột (CHỈ đưa vào lệnh SQL nếu cột đó thực sự tồn tại)
+        $mapColumn = function($possible_names, $value) use (&$insert_cols, &$insert_vals, $cols) {
+            foreach ($possible_names as $col_name) {
+                if (in_array($col_name, $cols)) {
+                    $insert_cols[] = $col_name;
+                    $insert_vals[] = $value;
+                    return; // Tìm thấy cột đúng thì dừng lại
+                }
+            }
+        };
+
+        // Quét từng trường dữ liệu, rà xem sếp đặt tên cột là gì thì tự động lấy tên đó
+        $mapColumn(['title', 'ten_tai_lieu'], $title);
+        $mapColumn(['author', 'tac_gia', 'nguoi_dang_tai'], $author);
+        $mapColumn(['category_id', 'category', 'the_loai', 'chuyen_muc', 'id_danhmuc'], $category_val);
+        $mapColumn(['thumbnail', 'anh_bia', 'image', 'hinh_anh'], $thumbnail);
+        $mapColumn(['description', 'mo_ta', 'tom_tat'], $description);
+        $mapColumn(['file_path', 'document_url', 'link_file', 'duong_dan', 'file'], $file_path);
+        $mapColumn(['uploaded_by', 'user_id', 'nguoi_dang', 'id_user'], $user_id);
+        $mapColumn(['status', 'trang_thai'], $status);
+
+        // Khớp cột thời gian (Tự động lấy giờ hiện tại)
+        if (in_array('created_at', $cols)) {
+            $insert_cols[] = 'created_at';
+            $insert_vals[] = date('Y-m-d H:i:s');
+        } elseif (in_array('ngay_dang', $cols)) {
+            $insert_cols[] = 'ngay_dang';
+            $insert_vals[] = date('Y-m-d H:i:s');
+        }
+
+        // 🚀 BƯỚC 3: Ghép thành câu lệnh SQL động an toàn tuyệt đối
+        $col_names_string = implode(', ', $insert_cols);
+        $placeholders = implode(', ', array_fill(0, count($insert_vals), '?'));
+        
+        $sql = "INSERT INTO documents ($col_names_string) VALUES ($placeholders)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($insert_vals);
+        
+        // Thành công!
+        $redirect_url = ($role === 'admin') ? '/LAPTRINHWEB/frontend/admin/documents.php' : '/LAPTRINHWEB/frontend/user/document.php';
+        $msg = ($role === 'admin') ? 'Phát hành tài liệu thành công!' : 'Đã gửi duyệt tài liệu! Vui lòng chờ Admin phê duyệt.';
+        
+        echo "<script>alert('$msg'); window.location.href = '$redirect_url';</script>";
+        exit();
+        
+    } catch (PDOException $e) {
+        // 🚨 DEBUG TẬN RĂNG: Nếu DB vẫn báo lỗi, nó sẽ in ra luôn danh sách cột thực tế của sếp để sếp dễ bắt bệnh
+        $actual_columns = implode(', ', $cols ?? []);
+        $error_msg = "Lỗi Database: " . addslashes($e->getMessage()) . "\\n\\n=> CÁC CỘT HIỆN CÓ TRONG DB CỦA BẠN LÀ: [ " . $actual_columns . " ]";
+        echo "<script>alert('$error_msg'); window.history.back();</script>";
+    }
 }
+?>

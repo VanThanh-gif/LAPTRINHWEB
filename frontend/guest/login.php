@@ -29,9 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
+                // CẤP PHÁT SESSION ĐẦY ĐỦ
                 $_SESSION['user_id'] = $user['user_id'] ?? $user['id'] ?? $user['ma_tk'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'] ?? $user['quyen'] ?? 'user';
+                $_SESSION['email'] = $user['email'];
+                
+                // Lấy Avatar từ DB lưu vào Session để Navbar hiển thị
+                $_SESSION['avatar'] = $user['avatar'] ?? null; 
                 
                 header("Location: " . ($_SESSION['role'] === 'admin' ? "../admin/dashboard.php" : "../user/document.php"));
                 exit();
