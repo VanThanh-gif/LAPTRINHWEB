@@ -52,6 +52,7 @@ $fallback_avatar = "https://ui-avatars.com/api/?name=" . urlencode($display_name
                 </li>
             </ul>
             
+
             <div class="d-flex align-items-center">
                 <div class="dropdown">
                     <a class="d-flex align-items-center text-decoration-none dropdown-toggle text-white fw-medium" href="#" data-bs-toggle="dropdown">
@@ -59,6 +60,18 @@ $fallback_avatar = "https://ui-avatars.com/api/?name=" . urlencode($display_name
                              onerror="this.onerror=null; this.src='<?= $fallback_avatar ?>';" 
                              alt="Avatar" class="rounded-circle me-2 border border-2 border-white bg-white" style="width: 38px; height: 38px; object-fit: cover;">
                         <span>Chào, <?= htmlspecialchars($display_name) ?></span>
+
+            <div class="dropdown">
+              <a class="text-white text-decoration-none dropdown-toggle fw-medium d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="<?= !empty($_SESSION['avatar']) ? htmlspecialchars($_SESSION['avatar']) : 'https://ui-avatars.com/api/?name=' . urlencode($_SESSION['username'] ?? 'U') . '&background=0D6EFD&color=fff&bold=true' ?>" alt="Avatar" class="rounded-circle" width="35" height="35">
+                <span>Chào, <?= htmlspecialchars($_SESSION['username'] ?? 'Bạn') ?></span>
+              </a>
+              
+              <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-3 rounded-3">
+                <li>
+                    <a class="dropdown-item py-2 fw-medium" href="/LAPTRINHWEB/frontend/user/profile.php">
+                        <i class="bi bi-person-circle me-2 text-secondary"></i> Hồ sơ cá nhân
+
                     </a>
 
                     <ul class="dropdown-menu dropdown-menu-end mt-2 shadow border-0" style="border-radius: 12px; min-width: 200px;">

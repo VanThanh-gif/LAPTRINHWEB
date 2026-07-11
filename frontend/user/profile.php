@@ -1,4 +1,5 @@
 <?php
+
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 if (!isset($_SESSION['user_id'])) {
     header("Location: /LAPTRINHWEB/frontend/guest/login.php");
@@ -16,6 +17,42 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 // Chuẩn bị ảnh dự phòng
 $fallback_avatar = "https://ui-avatars.com/api/?name=" . urlencode($user['username'] ?? 'User') . "&background=random";
 $avatar_url = !empty($user['avatar']) ? $user['avatar'] : $fallback_avatar;
+
+// Bật lỗi để debug
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../../includes/auth_check.php';
+require_login();
+require_once __DIR__ . '/../../config/connectdb.php';
+
+// Khởi tạo thông tin mặc định từ Session
+// Load from session first
+$user_name = $_SESSION['username'] ?? 'Thành viên AI Study Hub';
+$user_email = $_SESSION['email'] ?? 'Chưa cập nhật email';
+$user_role = $_SESSION['role'] ?? 'user';
+$join_date = 'Mới tham gia';
+$avatar_src = $_SESSION['avatar'] ?? null;
+
+// (Tùy chọn) Lấy thêm thông tin chi tiết từ Database nếu cần
+try {
+    $stmt = $conn->prepare("SELECT email, created_at, avatar FROM users WHERE user_id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($user_data) {
+        $user_email = $user_data['email'];
+        if (!empty($user_data['created_at'])) {
+            $join_date = date('d/m/Y', strtotime($user_data['created_at']));
+        }
+        if (isset($user_data['avatar']) && !empty($user_data['avatar'])) {
+            $avatar_src = $user_data['avatar'];
+        }
+    }
+} catch (PDOException $e) {
+    // Bỏ qua nếu lỗi database, vẫn hiển thị UI bằng data của Session
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -52,6 +89,7 @@ include_once $_SERVER['DOCUMENT_ROOT'] . '/LAPTRINHWEB/includes/navbar.php';
         <div class="col-lg-8 col-xl-7">
            <form action="/LAPTRINHWEB/backend/auth/update_profile.php" method="POST" enctype="multipart/form-data" class="card card-profile">
                 
+
                 <a href="document.php" class="text-white text-decoration-none fw-bold" style="position: absolute; top: 25px; left: 30px; z-index: 2;"><i class="bi bi-arrow-left me-2"></i>Trở về</a>
 
                 <div class="avatar-wrapper text-center">
@@ -60,6 +98,18 @@ include_once $_SERVER['DOCUMENT_ROOT'] . '/LAPTRINHWEB/includes/navbar.php';
                         <i class="bi bi-camera-fill"></i>
                     </label>
                     <input type="file" id="avatar-input" name="avatar" class="d-none" accept="image/png, image/jpeg, image/jpg">
+
+                <div class="avatar-container">
+                    <img src="<?= !empty($avatar_src) ? htmlspecialchars($avatar_src) : 'https://ui-avatars.com/api/?name=' . urlencode($user_name) . '&background=0D6EFD&color=fff&size=256' ?>" alt="Avatar" class="avatar-img">
+                </div>
+                
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold text-dark mb-1"><?= htmlspecialchars($user_name) ?></h2>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-bold">
+                        <i class="bi bi-person-badge"></i> 
+                        Vai trò: <?= ($user_role === 'admin') ? 'Quản trị viên (Admin)' : 'Sinh viên (User)' ?>
+                    </span>
+ f7ae2d2b09f2febe166078fb713dd74794ec0314
                 </div>
 
                 <div class="text-center mb-5">
